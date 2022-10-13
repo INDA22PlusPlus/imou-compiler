@@ -49,6 +49,7 @@ typedef enum {
     SYMBOL_MINUS,           /* - */
     SYMBOL_DIVIDE,          /* / */
     SYMBOL_MUL,             /* * */
+    SYMBOL_NOT,             /* ! */
 
 } _token_type;
 
@@ -91,6 +92,9 @@ _token* _tokenize(char* src, char* specialchars, char* whitespace,
     based if the parsed string only contains numerical characters or not  */
 _token_type _lookup_token_type(char* src, uint8_t src_len, char** keywords);
 
+/*  Returns if the given token is special or not. Used by the parser to
+    indicate whether or not a new AST node branch should be created or not*/
+bool _is_token_special(_token* token);
 
 /* Checks if the string only contains numerical values */
 bool _is_numerical_str(char* src, uint8_t src_len);
@@ -100,3 +104,10 @@ bool _is_lexical(char c);
 
 /* Checks if the input char is a ascii numerical character; 0-9*/
 bool _is_numerical(char c);
+
+/*  Used to identify the math precendence of tokens
+    for parsing mathematical expressions         */
+uint8_t _token_precedence(_token* token);
+
+/* Math operator associativity. 0 = Left; 1 = Right */
+uint8_t _token_associativity(_token* token);

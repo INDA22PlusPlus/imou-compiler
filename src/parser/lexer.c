@@ -11,7 +11,7 @@ const _token_type _LOOKUP_SPECIALCHAR[256] = {
     UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,
     UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,
     UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,
-    UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,
+    UNDEF, UNDEF, UNDEF, SYMBOL_NOT, UNDEF, UNDEF, UNDEF, UNDEF, UNDEF,  UNDEF,
     SYMBOL_OPARENTHESIS, SYMBOL_CPARENTHESIS, SYMBOL_MUL, SYMBOL_PLUS, UNDEF,
     SYMBOL_MINUS, UNDEF, SYMBOL_DIVIDE, UNDEF, UNDEF, UNDEF, UNDEF, UNDEF, UNDEF,
     UNDEF, UNDEF, UNDEF, UNDEF, UNDEF, SYMBOL_SEMICOLON, SYMBOL_OTRIANGLE,
@@ -136,6 +136,27 @@ _token* _tokenize(char* src, char* specialchars, char* whitespace,
     return realloc(tokens, sizeof(_token) * (last-tokens));
 }
 
+bool _is_token_special(_token* token) {
+    switch(token->type)
+    {
+    case KEYWORD_IF:        return true;
+    case KEYWORD_ELSE:      return true;
+    case KEYWORD_ELSEIF:    return true;
+    case KEYWORD_WHILE:     return true;
+    case KEYWORD_FOR:       return true;
+    
+    /* Should reset the stack in `_parse` */
+    case SYMBOL_SEMICOLON:  return true;
+    case SYMBOL_EQUAL:      return true;
+    case SYMBOL_PLUS:       return true;
+    case SYMBOL_MINUS:      return true;
+    case SYMBOL_DIVIDE:     return true;
+    case SYMBOL_MUL:        return true;
+
+    default:                return false;
+    }
+}
+
 bool _is_lexical(char c) {
     uint8_t t = (uint8_t)c;
     return (t >= 0x41 && t <= 0x5A) || (t >= 0x61 && t <= 0x7A);
@@ -192,5 +213,31 @@ _token_type _lookup_token_type(char* src, uint8_t src_len, char** keywords) {
 
         /* ...else it is just a variable/function name */
         return TYPE_VALUE_VAR;
+    }
+}
+
+/*  Used to identify the math precedence of tokens
+    for parsing mathematical expressions         */
+uint8_t _token_precedence(_token* token) {
+    switch(token->type)
+    {
+    case SYMBOL_PLUS:   return 1;
+    case SYMBOL_MINUS:  return 1;
+    case SYMBOL_MUL:    return 2;
+    case SYMBOL_DIVIDE: return 2;
+
+    default:            return 0;
+    }
+}
+
+uint8_t _token_associativity(_token* token) {
+    switch(token->type)
+    {
+    case SYMBOL_PLUS:   return 0;
+    case SYMBOL_MINUS:  return 0;
+    case SYMBOL_MUL:    return 0;
+    case SYMBOL_DIVIDE: return 0;
+    
+    default:            return 3;
     }
 }

@@ -1,1 +1,8 @@
-test<i32> = 20;
+test<i32> = 20+3*2-3;
+while (test != 0) {
+    if (test == 20) {
+        test = 1;
+    } else {
+        test = 0;
+    }
+}

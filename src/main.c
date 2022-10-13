@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "lexer.h"
+#include "parser.h"
 
 
 char* __read_file(const char* file) {
@@ -16,7 +17,8 @@ char* __read_file(const char* file) {
     file_size = ftell(in);
     fseek(in, 0, SEEK_SET);
 
-    file_buf = malloc(file_size);
+    file_buf = malloc(file_size+1);
+    file_buf[file_size] = '\0';
     fread(file_buf, 1, file_size, in);
     fclose(in);
 
@@ -38,7 +40,7 @@ int main() {
 
     /* null is not a special char, it just indicates the end of the list*/
     char specialchars[] = {';', '{', '}', '(', ')', '<', '>', '[', ']', '=',
-                            '^', '+', '-', '/', '*', '\0'};
+                            '^', '+', '-', '/', '*', '!', '\0'};
     char whitespaces[] = {'\t', ' ', '\n', '\0'};
 
     size_t token_num = 0;
@@ -48,6 +50,7 @@ int main() {
     _token* tokens = _tokenize(buf, &specialchars[0], &whitespaces[0],
                     &keywords[0], &token_num);
 
+    _parse(tokens, token_num);
     free(tokens);
     free(buf);
     return 0;
