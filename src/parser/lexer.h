@@ -50,6 +50,10 @@ typedef enum {
     SYMBOL_DIVIDE,          /* / */
     SYMBOL_MUL,             /* * */
     SYMBOL_NOT,             /* ! */
+    SYMBOL_COMMA,           /* , */
+
+    COMPARE_EQUAL,          /* == */
+    COMPARE_NEQUAL,         /* != */
 
 } _token_type;
 
@@ -105,9 +109,14 @@ bool _is_lexical(char c);
 /* Checks if the input char is a ascii numerical character; 0-9*/
 bool _is_numerical(char c);
 
+/*  Indicates if the given token is a comparison operator
+    a.k.a `>`, `<`, `==`, `!=`                                  */
+bool _token_compare_op(_token* token);
+
 /*  Used to identify the math precendence of tokens
     for parsing mathematical expressions         */
 uint8_t _token_precedence(_token* token);
 
 /* Math operator associativity. 0 = Left; 1 = Right */
 uint8_t _token_associativity(_token* token);
+

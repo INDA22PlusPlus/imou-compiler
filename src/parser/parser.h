@@ -10,6 +10,9 @@
 typedef enum {
     ASTNODETYPE_UNDEF,
 
+    FUNCTION_CALL,
+    FUNCTION_DEF,
+
     VARIABLE,
     CONSTANT,
 
@@ -18,6 +21,8 @@ typedef enum {
     COMPARE,
     BRANCH,
     IF_BRANCH,
+    ELSE_BRANCH,
+    ELSEIF_BRANCH,
     WHILE_BRANCH,
     FOR_BRANCH,
 
@@ -45,21 +50,15 @@ typedef struct _ASTNode ASTNode;
 /* Parses the tokens array and returns the AST root node */
 ASTNode* _parse(_token* tokens, size_t token_num);
 
-/*  Initializes an empty ASTNode with NULL values and `BRANCH` type,
-    just to clean up the code                                        */
-ASTNode* _init_default_ASTNode();
-
-/* Pushes the given child to the parent. Handles capacity management */
-void _push_child(ASTNode* parent, ASTNode* child);
-
-/*  Tries to construct a variable `ASTNode` from the given
-    stack                                                            */
-void _build_var_from_stack(ASTNode* node, _token** stack, uint8_t stack_size);
-
+/*  The famous shunting yard algorithm used to convert infix math expressions
+    to postfix aka reverse polish notation.                                 */
 void _shunting_yard_alg(_token* token, _token** query, uint8_t* query_size,
                         _token** op_stack, uint8_t* op_stack_size,
                          _token_type end_symbol);
+/*  Forces to pop the operators from the stack to the query. Should be used
+    when end of a math expression has occured                               */
+void _shunting_yard_alg_force_clean(_token** query, uint8_t* query_size,
+                                    _token** op_stack, uint8_t* op_stack_size);
 
-_ASTNodeType _token_type_to_node_type(_token_type type);
-
-ASTNode* _parse_rpn(_token** query, uint8_t query_size);
+/* Parses reverse polish notation of mathematical expressions */
+ASTNode* _parse_rpn(_token** query, uint8_t *query_size);

@@ -31,6 +31,7 @@ int main() {
     char* keywords[] = {
         "if",
         "else",
+        "elif",
         "for",
         "while",
         "break",
@@ -40,7 +41,7 @@ int main() {
 
     /* null is not a special char, it just indicates the end of the list*/
     char specialchars[] = {';', '{', '}', '(', ')', '<', '>', '[', ']', '=',
-                            '^', '+', '-', '/', '*', '!', '\0'};
+                            '^', '+', '-', '/', '*', ',', '!', '\0'};
     char whitespaces[] = {'\t', ' ', '\n', '\0'};
 
     size_t token_num = 0;
@@ -50,7 +51,7 @@ int main() {
     _token* tokens = _tokenize(buf, &specialchars[0], &whitespaces[0],
                     &keywords[0], &token_num);
 
-    _parse(tokens, token_num);
+    ASTNode* ast = _parse(tokens, token_num);
     free(tokens);
     free(buf);
     return 0;

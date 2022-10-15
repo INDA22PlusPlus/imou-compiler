@@ -1,7 +1,10 @@
 test<i32> = 20+3*2-3;
-while (test != 0) {
+print(test);
+while (test*2+4 != 1337) {
     if (test == 20) {
         test = 1;
+    } elif(test == 23) {
+        test = 3;
     } else {
         test = 0;
     }

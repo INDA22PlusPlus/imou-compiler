@@ -17,7 +17,71 @@ static char* memcpy_str(void* mem, size_t size) {
     return _str;
 }
 
-ASTNode* _init_default_ASTNode() {
+/*  Indicates if the given node is a branch-creating keyword
+    such as `while`, `for`, or `if` loop*/
+static bool _node_branch_containing(ASTNode* node) {
+    switch (node->type)
+    {
+    case IF_BRANCH:     return true;
+    case ELSE_BRANCH:   return true;
+    case ELSEIF_BRANCH: return true;
+    case WHILE_BRANCH:  return true;
+    case FOR_BRANCH:    return true;
+    default:            return false;
+    }
+}
+
+static ASTNode* _parent(ASTNode* node, _token* next) {
+    ASTNode* parent;
+
+    parent = node->parent;
+    switch (parent->type)
+    {
+    case IF_BRANCH:
+        if (parent->children_num < 2) {
+            free(node);
+            perror("Syntax error: Illegal `if` statement");
+            abort();
+        }
+
+        if (next->type != KEYWORD_ELSE &&
+            next->type != KEYWORD_ELSEIF) {
+            parent = parent->parent;
+            break;
+        }
+        return parent;
+    case ELSEIF_BRANCH:
+        if (parent->children_num < 2) {
+            free(node);
+            perror("Syntax error: Illegal `elif` statement");
+            abort();
+        }
+        if (next->type != KEYWORD_ELSE &&
+            next->type != KEYWORD_ELSEIF) {
+            parent = parent->parent->parent;
+            break;
+        }
+        /* Leave the whole if statement if no else or elif */
+        return parent->parent;
+    case WHILE_BRANCH:
+        if (parent->children_num < 2) {
+            free(node);
+            perror("Syntax error: Illegal `while` statement");
+            abort();
+        }
+        if (parent->children_num == 2) {
+            parent = parent->parent;
+            break;
+        }
+        return parent;
+    }
+
+    return parent;
+}
+
+/*  Initializes an empty ASTNode with NULL values and `BRANCH` type,
+    just to clean up the code                                        */
+static ASTNode* _init_default_ASTNode() {
     ASTNode* target = malloc( sizeof(ASTNode) );
     
     target->parent          = NULL;
@@ -30,7 +94,8 @@ ASTNode* _init_default_ASTNode() {
     return target;
 }
 
-void _push_child(ASTNode* parent, ASTNode* child) {
+/* Pushes the given child to the parent. Handles capacity management */
+static void _push_child(ASTNode* parent, ASTNode* child) {
     /* Expand the node's capacity if needed*/
     if (parent->capacity == parent->children_num) {
         parent->capacity += __ASTNODE_REALLOC_SIZE;
@@ -45,7 +110,9 @@ void _push_child(ASTNode* parent, ASTNode* child) {
     free(child);
 }
 
-void _build_var_from_stack(ASTNode* node, _token** stack, uint8_t stack_size) {
+/*  Tries to construct a variable `ASTNode` from the given
+    stack                                                            */
+static void _build_var_from_stack(ASTNode* node, _token** stack, uint8_t stack_size) {
     node->type          = VARIABLE;
     node->capacity      = 0;
     node->children      = NULL;
@@ -56,20 +123,25 @@ void _build_var_from_stack(ASTNode* node, _token** stack, uint8_t stack_size) {
         `stack_size` == 4: new variable with given type*/
         
     /* When memory overflow without error is actually a good thing*/
-    if ((stack_size != 1 || stack_size != 4) && 
+    /* 1+1 and 4+1, the assignment operator is in stack and it counts too*/
+    if ((stack_size != 2 || stack_size != 5) && 
         (stack[0]->type != TYPE_VALUE_VAR)) {
     
+        free(stack);
+        free(node);
         perror("Not valid variable identifier");
         abort();
     }
 
     node->value = memcpy_str(stack[0]->beg, stack[0]->length);
     
-    if (stack_size == 1) {return;}
+    if (stack_size == 2) {return;}
 
     if (stack[1]->type != SYMBOL_OTRIANGLE ||
         stack[3]->type != SYMBOL_CTRIANGLE) {
 
+        free(stack);
+        free(node);
         perror("Not valid variable identifier");
         abort();
     }
@@ -78,12 +150,12 @@ void _build_var_from_stack(ASTNode* node, _token** stack, uint8_t stack_size) {
     node->options[0] = memcpy_str(stack[2]->beg, stack[2]->length);
 }
 
-ASTNode* _node_from_token(_token* token, _token** stack,
+/* Creates valid ASTNode based on the token type and stack input */
+static ASTNode* _node_from_token(_token* token, _token** stack,
                                 uint8_t* stack_size) {
 
     ASTNode*    target;
     
-
     target = _init_default_ASTNode();
     if (!_is_token_special(token) || token->type == SYMBOL_SEMICOLON) {
         return NULL;
@@ -95,79 +167,31 @@ ASTNode* _node_from_token(_token* token, _token** stack,
     case SYMBOL_OBRACE:
         target->type = BRANCH;
         break;
+    
     case SYMBOL_OPARENTHESIS:
-        target->type = EXPRESSION;
+        if (stack[(*stack_size)-2]->type == TYPE_VALUE_VAR) {
+            target->type = FUNCTION_CALL;
+            target->value = memcpy_str(stack[*stack_size-2]->beg,
+                                        stack[*stack_size-2]->length);
+        }
         break;
+
     case SYMBOL_EQUAL:
         target->type = ASSIGNMENT;
         
-        _build_var_from_stack(&target->children[0], stack, stack_size);
+        /*  Must include a variable at left side */
+        _build_var_from_stack(&target->children[0], stack, *stack_size);
         target->children_num++;
 
-        *stack_size = 0;
-        break;
-    case SYMBOL_PLUS:
-        target->type = OPERATOR_PLUS;
-
-        if (stack_size != 1 || stack[0]->type == TYPE_VALUE_NUM
-            || stack[0]->type == TYPE_VALUE_VAR) {
-            perror("Non-valid expression");
-            abort();
-        }
-
-        target->children[0].type = (stack[0]->type==TYPE_VALUE_VAR)?VARIABLE:CONSTANT;
-        target->children[0].value = memcpy_str(stack[0]->beg, stack[0]->length);
-        target->children_num++;
-
-        *stack_size = 0;
-        break;
-    case SYMBOL_MINUS:
-        target->type = OPERATOR_MINUS;
-
-        if (stack_size != 1 || stack[0]->type == TYPE_VALUE_NUM
-            || stack[0]->type == TYPE_VALUE_VAR) {
-            perror("Non-valid expression");
-            abort();
-        }
-
-        target->children[0].type = (stack[0]->type==TYPE_VALUE_VAR)?VARIABLE:CONSTANT;
-        target->children[0].value = memcpy_str(stack[0]->beg, stack[0]->length);
-        target->children_num++;
-
-        *stack_size = 0;
-        break;
-    case SYMBOL_MUL:
-        target->type = OPERATOR_MUL;
-
-        if (*stack_size != 1 || stack[0]->type == TYPE_VALUE_NUM
-            || stack[0]->type == TYPE_VALUE_VAR) {
-            perror("Non-valid expression");
-            abort();
-        }
-
-        target->children[0].type = (stack[0]->type==TYPE_VALUE_VAR)?VARIABLE:CONSTANT;
-        target->children[0].value = memcpy_str(stack[0]->beg, stack[0]->length);
-        target->children_num++;
-
-        *stack_size = 0;
-        break;
-    case SYMBOL_DIVIDE:
-        target->type = OPERATOR_DIV;
-
-        if (stack_size != 1 || stack[0]->type == TYPE_VALUE_NUM
-            || stack[0]->type == TYPE_VALUE_VAR) {
-            perror("Non-valid expression");
-            abort();
-        }
-
-        target->children[0].type = (stack[0]->type==TYPE_VALUE_VAR)?VARIABLE:CONSTANT;
-        target->children[0].value = memcpy_str(stack[0]->beg, stack[0]->length);
-        target->children_num++;
-
-        *stack_size = 0;
         break;
     case KEYWORD_IF:
         target->type = IF_BRANCH;
+        break;
+    case KEYWORD_ELSE:
+        target->type = ELSE_BRANCH;
+        break;
+    case KEYWORD_ELSEIF:
+        target->type = ELSEIF_BRANCH;
         break;
     case KEYWORD_WHILE:
         target->type = WHILE_BRANCH;
@@ -175,11 +199,44 @@ ASTNode* _node_from_token(_token* token, _token** stack,
     case KEYWORD_FOR:
         target->type = FOR_BRANCH;
         break;
+
+    /* This implies that all mathematical expressions that are outside
+        assignments, are going to be ignored*/
     default:    return NULL;
     }
+    
+    *stack_size = 0;
     return target;
 }
 
+static _ASTNodeType _token_type_to_node_type(_token_type type) {
+    switch(type)
+    {
+    case SYMBOL_PLUS:       return OPERATOR_PLUS;
+    case SYMBOL_MINUS:      return OPERATOR_MINUS;
+    case SYMBOL_MUL:        return OPERATOR_MUL;
+    case SYMBOL_DIVIDE:     return OPERATOR_DIV;
+    case TYPE_VALUE_NUM:    return CONSTANT;
+    case TYPE_VALUE_VAR:    return VARIABLE;
+    default:                return ASTNODETYPE_UNDEF;
+    }
+}
+
+
+/* Empties and pops the operator stack into the query */
+void _shunting_yard_alg_force_clean(_token** query, uint8_t* query_size,
+                                    _token** op_stack, uint8_t* op_stack_size) {
+
+    if (*op_stack_size == 0) { return; }
+
+    for(int i = *op_stack_size-1; i >= 0; i--) {
+        query[(*query_size)++] = op_stack[i];
+    }
+    
+    *op_stack_size = 0;
+}
+
+/* Shunting-yard algorithm to parse mathematical expressions*/
 void _shunting_yard_alg(_token* token, _token** query, uint8_t* query_size,
                         _token** op_stack, uint8_t* op_stack_size,
                          _token_type end_symbol) {
@@ -188,12 +245,10 @@ void _shunting_yard_alg(_token* token, _token** query, uint8_t* query_size,
     _token* op = op_stack[*op_stack_size-1];
 
     /* Empty the stack on expression end */
-    if (token->type == end_symbol && *op_stack_size > 0) {
-        for(int i = *op_stack_size-1; i >= 0; i--) {
-            query[(*query_size)++] = op_stack[i];
-        }
-        
-        *op_stack_size = 0;
+    if (token->type == end_symbol) {
+        _shunting_yard_alg_force_clean(query, query_size, 
+                                        op_stack, op_stack_size);
+        return;
     }
 
     if (token->type == TYPE_VALUE_NUM ||
@@ -211,6 +266,8 @@ void _shunting_yard_alg(_token* token, _token** query, uint8_t* query_size,
             uint8_t op_prec = _token_precedence(op_stack[i]);
             /* If not a valid token in math expression - raise an error*/
             if (op_prec == 0 || token_assoc == 3) {
+                free(query);
+                free(op_stack);
                 perror("Not valid token in math expression");
                 exit(-1);
             }
@@ -234,27 +291,15 @@ void _shunting_yard_alg(_token* token, _token** query, uint8_t* query_size,
     op_stack[(*op_stack_size)++] = token;                    
 }
 
-_ASTNodeType _token_type_to_node_type(_token_type type) {
-    switch(type)
-    {
-    case SYMBOL_PLUS:       return OPERATOR_PLUS;
-    case SYMBOL_MINUS:      return OPERATOR_MINUS;
-    case SYMBOL_MUL:        return OPERATOR_MUL;
-    case SYMBOL_DIVIDE:     return OPERATOR_DIV;
-    case TYPE_VALUE_NUM:    return CONSTANT;
-    case TYPE_VALUE_VAR:    return VARIABLE;
-    default:                return ASTNODETYPE_UNDEF;
-    }
-}
-
-ASTNode* _parse_rpn(_token** query, uint8_t query_size) {
+ASTNode* _parse_rpn(_token** query, uint8_t* query_size) {
     ASTNode*    root;
     ASTNode*    node;
     
     root = _init_default_ASTNode();
-    root->type = _token_type_to_node_type(query[query_size-1]->type);
+    root->type = _token_type_to_node_type(query[(*query_size)-1]->type);
 
     if (root->type == ASTNODETYPE_UNDEF) {
+        free(query);
         perror("Non valid token");
         exit(-1);
     }
@@ -262,13 +307,13 @@ ASTNode* _parse_rpn(_token** query, uint8_t query_size) {
     /*  If the last one is an variable or constant, it indicates that
         there is no mathematical expression */
     if (root->type == VARIABLE || root->type == CONSTANT) {
-        root->value = memcpy_str(query[query_size-1]->beg,
-                                 query[query_size-1]->length);
+        root->value = memcpy_str(query[(*query_size)-1]->beg,
+                                 query[(*query_size)-1]->length);
     }
 
     node = root;
     
-    for (int i = query_size-2; i >= 0; i-- ) {
+    for (int i = (*query_size)-2; i >= 0; i-- ) {
         /* Create a new tree sub node if operand */
         if (_is_token_special(query[i])) {
             ASTNode* sub = _init_default_ASTNode();
@@ -283,7 +328,7 @@ ASTNode* _parse_rpn(_token** query, uint8_t query_size) {
         /*  If the binary math operator node is fully filled
             jump to the parent one                          */
         if (node->children_num == 2) {
-            node = node->parent;
+            node = _parent(node, query[i+1]);
         }
         
         /*  Create a variable or constant node. Free the memory
@@ -298,9 +343,68 @@ ASTNode* _parse_rpn(_token** query, uint8_t query_size) {
         _push_child(node, value);
     }
 
+    /* Parsed the query, just "empty" it*/
+    *query_size = 0;
+
     return root;
 }
 
+static ASTNode* _parse_comparison(_token** stack, uint8_t stack_size) {
+    _token**    query;
+    _token**    op_stack;
+    
+    uint8_t     query_size;
+    uint8_t     op_stack_size;
+
+    ASTNode*    node;
+    
+
+    query = malloc(sizeof(_token*) * 256);
+    op_stack = malloc(sizeof(_token*) * 256);
+
+    query_size = 0;
+    op_stack_size = 0;
+
+    node = _init_default_ASTNode();
+    node->value = malloc(1);
+    node->type = COMPARE;
+
+
+    if (stack[0]->type != SYMBOL_OPARENTHESIS ||
+        stack[stack_size-1]->type != SYMBOL_CPARENTHESIS ||
+        stack_size == 2) {
+        free(query);
+        free(op_stack);
+        perror("Syntax error: problem with `while`");
+        abort();
+    }
+
+    for (int i = 1; i < stack_size - 1; i++ ) {
+        if (_token_compare_op(stack[i])) {
+            /* Encode the integer type as a char */
+            *node->value = (char)stack[i]->type;
+
+            _shunting_yard_alg_force_clean(query, &query_size,
+                                            op_stack, &op_stack_size);
+            ASTNode* part1 = _parse_rpn(query, &query_size);
+            _push_child(node, part1);
+        } else {
+            _shunting_yard_alg(stack[i], query, &query_size,
+                                op_stack, &op_stack_size, UNDEF);
+        }
+    }
+    _shunting_yard_alg_force_clean(query, &query_size,
+                                    op_stack, &op_stack_size);
+    ASTNode* part2 = _parse_rpn(query, &query_size);
+    _push_child(node, part2);
+
+    free(query);
+    free(op_stack);
+    return node;
+}
+
+
+/*  MAIN PARSE FUNCTION USED TO CREATE AN AST FROM A LINEAR LIST OF TOKENS */
 ASTNode* _parse(_token* tokens, size_t token_num) {
     /*  `node` holds the current node that is used to store the parsed
         tokens. `token` holds the current token analyzed. `stack`
@@ -339,12 +443,46 @@ ASTNode* _parse(_token* tokens, size_t token_num) {
 
 
     while (token - tokens < token_num) {
-        if (!_is_token_special(token)) {
-            stack[stack_size++] = token;
+        stack[stack_size++] = token;
+
+        if (token->type == SYMBOL_CBRACE) {
+
+            node = _parent(node, token+1);
+            stack_size = 0;
+            token++;
+            continue;
         }
 
         switch(node->type)
         {
+        case FUNCTION_CALL:
+            ASTNode*        sub;
+
+            switch (token->type)
+            {
+            case SYMBOL_CPARENTHESIS:
+                _shunting_yard_alg_force_clean(query, &query_size, op_stack,
+                                                &op_stack_size);
+                 sub = _parse_rpn(query, &query_size);
+                _push_child(node, sub);
+
+                /* End of function call, just jump to the parent */
+                node = _parent(node, token+1);
+                break;
+            case SYMBOL_COMMA:
+                /* Pops the operator stack on comma*/
+                _shunting_yard_alg(token, query, &query_size, op_stack, &op_stack_size,
+                                    SYMBOL_COMMA);
+                sub = _parse_rpn(query, &query_size);
+                _push_child(node, sub);
+                break;
+            default:
+                _shunting_yard_alg(token, query, &query_size, op_stack, &op_stack_size,
+                    SYMBOL_COMMA);
+                break;
+            }
+
+            break;
         case ASSIGNMENT:
             /*  In an assignment `ASTNode` it's suitable to have an
                 mathematical expression to parse                            */
@@ -355,40 +493,81 @@ ASTNode* _parse(_token* tokens, size_t token_num) {
                                 SYMBOL_SEMICOLON);
 
             if (token->type == SYMBOL_SEMICOLON) {
-                ASTNode* expr = _parse_rpn(query, query_size);
+                ASTNode* expr = _parse_rpn(query, &query_size);
                 _push_child(node, expr);
+                node = _parent(node, token+1);
             }
             break;
-        case OPERATOR_PLUS:
-            break;
-        case WHILE_BRANCH:  break;
-        case IF_BRANCH:     break;
-        case FOR_BRANCH:    break;
-        case BRANCH:
+        case ELSEIF_BRANCH:
+            if (node->parent->type != IF_BRANCH) {
+                free(tokens);
+                free(root);
+                perror("Syntax error: `elif` not in `if` block");
+                exit(-1);
+            }
+            /* FALLTHROUGH */
+            /*  People need to learn to exploit switch case fallthoughs,
+                than hating on them so much                             */
+        case IF_BRANCH:
+            if (node->children_num > 0 && node->type != ELSEIF_BRANCH) {
+                ASTNode* _sub = _node_from_token(token, stack, &stack_size);                
+                if (!_sub) { break; }
 
-            /*"empty" the stack if semicolon detected*/
-            if (token->type == SYMBOL_SEMICOLON) {
-                stack_size = 0;
-                break;
-            }            
+                /* If the next branch is an else branch,
+                    ignore the opening brace            */
+                if (_sub->type == ELSE_BRANCH
+                    && (token+1)->type == SYMBOL_OBRACE) {
+                    token++;
+                }
 
-            switch(token->type)
-            {
-            case SYMBOL_EQUAL:
-                ASTNode* assign = _node_from_token(token, stack, &stack_size);                
-
-                _push_child(node, assign);
+                _push_child(node, _sub);
                 node = &node->children[node->children_num-1];
                 stack_size = 0;
                 break;
             }
+            /* FALLTHROUGH */
+        case WHILE_BRANCH:
+            /* Indicates the end of condition expression */
+            if (node->children_num == 0 && token->type == SYMBOL_OBRACE) {
+                /* Creates the condition subnode and does error handling */
+                ASTNode* compare = _parse_comparison(stack, stack_size-1);
+                _push_child(node, compare);
+
+                /*  Create a new branch which is the body of the while
+                    loop*/
+                ASTNode* branch  = _init_default_ASTNode();
+                _push_child(node, branch);
+                /* After `push_child`, the `branch` node memory is freed */
+                node = &node->children[node->children_num-1];
+                
+                stack_size = 0;
+            }
+            break;
+        case FOR_BRANCH:    break;
+        /* Else branch does not have any compare node operators,
+            so it's just another branch. Interpret it as an
+            `BRANCH` node.                                  */
+        case ELSE_BRANCH:
+        case BRANCH:          
+
+            ASTNode* _sub = _node_from_token(token, stack, &stack_size);                
+            if (!_sub) { break; }
+
+            _push_child(node, _sub);
+            node = &node->children[node->children_num-1];
+            stack_size = 0;
+            
 
             break;
-        default: break;
         }
 
         token++;
     }
+
+    /*"empty" the stack if semicolon detected*/
+    if (token->type == SYMBOL_SEMICOLON) {
+        stack_size = 0;
+    }  
 
     free(stack);
     return root;

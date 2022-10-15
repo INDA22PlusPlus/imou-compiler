@@ -1,0 +1,26 @@
+<var>		::=	[a-z]+ "<i32>" | [a-z]+
+<num>		::= [0-9]+
+<expr>		::=	<expr> "*" <var> | <expr> "-" <var> | <expr> "/" <var> | <expr> "+" <var>
+			|	<expr> "*" <num> | <expr> "-" <num> | <expr> "/" <num> | <expr> "+" <num>
+            |	<var>			 | <num>
+<assign>	::= <var> "=" <expr> ";"
+
+<b_exp>     ::= "(" <b_exp> ")"  | <var>            | <expr> <eq_op> <expr>
+            | <b_exp> <eq_op> <b_exp>
+            | <expr> <cmp_op> <expr>
+<eq_op>     ::= "=="             | "!="
+<cmp_op>    ::= ">"              | "<"
+
+<while_statement> ::= "while(" <b_exp> "){" <statement> "}"
+<elif_statement> ::= "}elif(" <b_exp> "){" <statement>
+<if_statement> ::= "if(" <b_exp> "){" <statement> "}"
+ |	"if(" <b_exp> "){" <statement> "}else{" <statement> "}"
+ |	"if(" <b_exp> "){" <statement> <elif_statement>+ "}else{" <statement> "}"
+
+<statement>	::= <assign>  | <while_statement> | <if_statement>   | "print(" <expr> ");"
+ 			|	<statement> ";" <statement>
+            
+         
+            
+
+ 

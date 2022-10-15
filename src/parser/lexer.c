@@ -12,7 +12,7 @@ const _token_type _LOOKUP_SPECIALCHAR[256] = {
     UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,
     UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,  UNDEF,
     UNDEF, UNDEF, UNDEF, SYMBOL_NOT, UNDEF, UNDEF, UNDEF, UNDEF, UNDEF,  UNDEF,
-    SYMBOL_OPARENTHESIS, SYMBOL_CPARENTHESIS, SYMBOL_MUL, SYMBOL_PLUS, UNDEF,
+    SYMBOL_OPARENTHESIS, SYMBOL_CPARENTHESIS, SYMBOL_MUL, SYMBOL_PLUS, SYMBOL_COMMA,
     SYMBOL_MINUS, UNDEF, SYMBOL_DIVIDE, UNDEF, UNDEF, UNDEF, UNDEF, UNDEF, UNDEF,
     UNDEF, UNDEF, UNDEF, UNDEF, UNDEF, SYMBOL_SEMICOLON, SYMBOL_OTRIANGLE,
     SYMBOL_EQUAL, SYMBOL_CTRIANGLE, UNDEF, UNDEF, UNDEF, UNDEF, UNDEF, UNDEF,
@@ -98,6 +98,25 @@ _token* _tokenize(char* src, char* specialchars, char* whitespace,
             last->length = 1;
             last->type = type;
 
+            _token_type next = _LOOKUP_SPECIALCHAR[(uint8_t)(*(c+1))];
+            switch (type)
+            {
+            case SYMBOL_EQUAL:
+                if (next == SYMBOL_EQUAL) {
+                    last->length++;
+                    last->type = COMPARE_EQUAL; 
+                    c++;
+                }
+                break;
+
+            case SYMBOL_NOT:
+                if (next == SYMBOL_EQUAL) {
+                    last->length++;
+                    last->type = COMPARE_NEQUAL;
+                    c++;
+                }
+                break;
+            }
             c++;
             /* Initialize the next one  */
             last++;
@@ -139,21 +158,23 @@ _token* _tokenize(char* src, char* specialchars, char* whitespace,
 bool _is_token_special(_token* token) {
     switch(token->type)
     {
-    case KEYWORD_IF:        return true;
-    case KEYWORD_ELSE:      return true;
-    case KEYWORD_ELSEIF:    return true;
-    case KEYWORD_WHILE:     return true;
-    case KEYWORD_FOR:       return true;
+    case KEYWORD_IF:            return true;
+    case KEYWORD_ELSE:          return true;
+    case KEYWORD_ELSEIF:        return true;
+    case KEYWORD_WHILE:         return true;
+    case KEYWORD_FOR:           return true;
     
     /* Should reset the stack in `_parse` */
-    case SYMBOL_SEMICOLON:  return true;
-    case SYMBOL_EQUAL:      return true;
-    case SYMBOL_PLUS:       return true;
-    case SYMBOL_MINUS:      return true;
-    case SYMBOL_DIVIDE:     return true;
-    case SYMBOL_MUL:        return true;
+    case SYMBOL_SEMICOLON:      return true;
+    case SYMBOL_EQUAL:          return true;
+    case SYMBOL_PLUS:           return true;
+    case SYMBOL_MINUS:          return true;
+    case SYMBOL_DIVIDE:         return true;
+    case SYMBOL_MUL:            return true;
 
-    default:                return false;
+    case SYMBOL_OPARENTHESIS:   return true;
+
+    default:                    return false;
     }
 }
 
@@ -181,7 +202,7 @@ _token_type _lookup_token_type(char* src, uint8_t src_len, char** keywords) {
     int matched_index = -1;
     /*  Loop through all allowed keywords and register at what index the
         keyword did match with the source                               */
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < 8; i++) {
         size_t keyword_len = strlen(keywords[i]);
 
         /* We do memory safe operations in this code */
@@ -198,11 +219,12 @@ _token_type _lookup_token_type(char* src, uint8_t src_len, char** keywords) {
     {
     case 0:     return KEYWORD_IF;
     case 1:     return KEYWORD_ELSE;
-    case 2:     return KEYWORD_FOR;
-    case 3:     return KEYWORD_WHILE;
-    case 4:     return KEYWORD_BREAK;
-    case 5:     return KEYWORD_CONTINUE;
-    case 6:     return TYPE_I32;
+    case 2:     return KEYWORD_ELSEIF;
+    case 3:     return KEYWORD_FOR;
+    case 4:     return KEYWORD_WHILE;
+    case 5:     return KEYWORD_BREAK;
+    case 6:     return KEYWORD_CONTINUE;
+    case 7:     return TYPE_I32;
 
     default:
         /*  If the parsed value contains only numerical values,
@@ -213,6 +235,19 @@ _token_type _lookup_token_type(char* src, uint8_t src_len, char** keywords) {
 
         /* ...else it is just a variable/function name */
         return TYPE_VALUE_VAR;
+    }
+}
+
+/* Indicates if the given token is an comparison operator */
+bool _token_compare_op(_token* token) {
+    switch (token->type)
+    {
+    case COMPARE_EQUAL:     return true;
+    case COMPARE_NEQUAL:    return true;
+    case SYMBOL_OTRIANGLE:  return true;
+    case SYMBOL_CTRIANGLE:  return true;
+
+    default:                return false;
     }
 }
 
