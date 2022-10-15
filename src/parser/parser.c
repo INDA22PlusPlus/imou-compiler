@@ -17,17 +17,38 @@ static char* memcpy_str(void* mem, size_t size) {
     return _str;
 }
 
-/*  Indicates if the given node is a branch-creating keyword
-    such as `while`, `for`, or `if` loop*/
-static bool _node_branch_containing(ASTNode* node) {
-    switch (node->type)
+static const char* _node_type_to_str(_ASTNodeType type) {
+    switch (type)
     {
-    case IF_BRANCH:     return true;
-    case ELSE_BRANCH:   return true;
-    case ELSEIF_BRANCH: return true;
-    case WHILE_BRANCH:  return true;
-    case FOR_BRANCH:    return true;
-    default:            return false;
+    case FUNCTION_CALL:         return "FUNCTION CALL";
+    case FUNCTION_DEF:          return "FUNCTION DEFINITION";
+    case VARIABLE:              return "VARIABLE";
+    case CONSTANT:              return "CONSTANT";
+    case ASSIGNMENT:            return "ASSIGNMENT";
+    case EXPRESSION:            return "EXPRESSION";
+    case COMPARE:               return "COMPARISON";
+    case BRANCH:                return "BRANCH";
+    case IF_BRANCH:             return "IF";
+    case ELSE_BRANCH:           return "ELSE";
+    case ELSEIF_BRANCH:         return "ELSE IF";
+    case WHILE_BRANCH:          return "WHILE";
+    case FOR_BRANCH:            return "FOR";
+    case OPERATOR_PLUS:         return "+";
+    case OPERATOR_MINUS:        return "-";
+    case OPERATOR_DIV:          return "/";
+    case OPERATOR_MUL:          return "*";
+    default:                    return "UNDEF";
+    }
+}
+
+static const char* _comparison_to_str(_token* token) {
+    switch (token->type)
+    {
+    case SYMBOL_OTRIANGLE:      return "<";
+    case SYMBOL_CTRIANGLE:      return ">";
+    case COMPARE_EQUAL:         return "==";
+    case COMPARE_NEQUAL:        return "!=";
+    default:                    return NULL;
     }
 }
 
@@ -74,6 +95,8 @@ static ASTNode* _parent(ASTNode* node, _token* next) {
             break;
         }
         return parent;
+
+    default:    break;
     }
 
     return parent;
@@ -241,9 +264,6 @@ void _shunting_yard_alg(_token* token, _token** query, uint8_t* query_size,
                         _token** op_stack, uint8_t* op_stack_size,
                          _token_type end_symbol) {
 
-    /* The last operator on the stack */
-    _token* op = op_stack[*op_stack_size-1];
-
     /* Empty the stack on expression end */
     if (token->type == end_symbol) {
         _shunting_yard_alg_force_clean(query, query_size, 
@@ -366,7 +386,6 @@ static ASTNode* _parse_comparison(_token** stack, uint8_t stack_size) {
     op_stack_size = 0;
 
     node = _init_default_ASTNode();
-    node->value = malloc(1);
     node->type = COMPARE;
 
 
@@ -382,7 +401,7 @@ static ASTNode* _parse_comparison(_token** stack, uint8_t stack_size) {
     for (int i = 1; i < stack_size - 1; i++ ) {
         if (_token_compare_op(stack[i])) {
             /* Encode the integer type as a char */
-            *node->value = (char)stack[i]->type;
+            node->value = strdup(_comparison_to_str(stack[i]));
 
             _shunting_yard_alg_force_clean(query, &query_size,
                                             op_stack, &op_stack_size);
@@ -426,9 +445,9 @@ ASTNode* _parse(_token* tokens, size_t token_num) {
     
 
     if (tokens->length == 0) {
-        return root;
+        return NULL;
     }
-    root            = _init_default_ASTNode(root);
+    root            = _init_default_ASTNode();
     node            = root;
     token           = tokens;
     
@@ -559,7 +578,9 @@ ASTNode* _parse(_token* tokens, size_t token_num) {
             
 
             break;
+        default:    break;
         }
+
 
         token++;
     }
@@ -571,4 +592,31 @@ ASTNode* _parse(_token* tokens, size_t token_num) {
 
     free(stack);
     return root;
+}
+
+void _stdout_json_serialize_ASTNode(ASTNode* root) {
+    if (!root) { return; }
+
+    printf("{\"type\": \"%s\"", _node_type_to_str(root->type));
+    if (root->value) {
+        printf(", \"value\": \"%s\"", root->value);
+    }
+
+    if (root->options) {
+        printf(", \"options\": \"%s\"", *root->options);
+    }
+ 
+    if (root->children_num > 0) {
+        printf(", \"children\": [");
+
+        for (int i = 0; i < root->children_num; i++) {
+            _stdout_json_serialize_ASTNode(&root->children[i]);
+            if (i != root->children_num - 1) {
+                printf(", ");
+            }
+        }
+        printf("]");
+    }
+    printf("}");
+
 }

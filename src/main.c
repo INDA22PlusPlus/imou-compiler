@@ -52,6 +52,8 @@ int main() {
                     &keywords[0], &token_num);
 
     ASTNode* ast = _parse(tokens, token_num);
+    _stdout_json_serialize_ASTNode(ast);
+
     free(tokens);
     free(buf);
     return 0;

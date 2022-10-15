@@ -1,5 +1,4 @@
 #pragma once
-
 #include <stdlib.h>
 
 #include "lexer.h"
@@ -49,6 +48,10 @@ typedef struct _ASTNode ASTNode;
 
 /* Parses the tokens array and returns the AST root node */
 ASTNode* _parse(_token* tokens, size_t token_num);
+
+/*  Serializes the `ASTNode` tree from a given root, into json and puts
+    it in stdout*/
+void _stdout_json_serialize_ASTNode(ASTNode* root);
 
 /*  The famous shunting yard algorithm used to convert infix math expressions
     to postfix aka reverse polish notation.                                 */
