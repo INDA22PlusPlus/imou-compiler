@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "lexer.h"
-#include "parser.h"
+#include "parser/lexer.h"
+#include "parser/parser.h"
 
 
 char* __read_file(const char* file) {
