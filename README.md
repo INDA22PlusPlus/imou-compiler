@@ -11,8 +11,8 @@ Reads a null-terminated string, and returns a pre-allocated array of tokens with
 ## Parser
 Converts the given token array from the tokenizer function, into a pre-allocated Abstract Syntax Tree (AST).
 <br>
-The image below demonstrates the output of the parser function.
-INSERT IMAGE HERE
+The image below demonstrates the output of the parser function. Cred to [ivan111](https://github.com/ivan111/vtree), for the JSON tree visualizer. ![image](https://user-images.githubusercontent.com/68696386/196812284-0f8c6719-ff57-47d7-8efb-acf2e453dcf5.png)
+
 
 ## Compiler (in progress)
 Final goal is to convert a lang file into a fully working x86-64 assembly. For now, math expressions are compiled into assembly instructions which work as they should.
