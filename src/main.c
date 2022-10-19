@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "compiler/compiler.h"
 #include "parser/lexer.h"
 #include "parser/parser.h"
 
@@ -46,13 +47,15 @@ int main() {
 
     size_t token_num = 0;
     
-    char* buf = __read_file("tests/files/test.txt");
+    char* buf = __read_file("examples/lang-files/test.txt");
 
     _token* tokens = _tokenize(buf, &specialchars[0], &whitespaces[0],
                     &keywords[0], &token_num);
 
     ASTNode* ast = _parse(tokens, token_num);
-    _stdout_json_serialize_ASTNode(ast);
+    //_stdout_json_serialize_ASTNode(ast);
+
+    _compile(ast, NULL);
 
     free(tokens);
     free(buf);

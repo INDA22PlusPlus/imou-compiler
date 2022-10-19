@@ -49,6 +49,8 @@ typedef struct _ASTNode ASTNode;
 /* Parses the tokens array and returns the AST root node */
 ASTNode* _parse(_token* tokens, size_t token_num);
 
+const char* _node_type_to_str(_ASTNodeType type);
+
 /*  Serializes the `ASTNode` tree from a given root, into json and puts
     it in stdout*/
 void _stdout_json_serialize_ASTNode(ASTNode* root);

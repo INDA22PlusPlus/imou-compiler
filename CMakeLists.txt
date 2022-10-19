@@ -11,4 +11,4 @@ add_executable(compiler
     src/parser/lexer.c
     src/parser/parser.c)
 
-target_compile_options(compiler PRIVATE -Wall -Wextra -g)
+target_compile_options(compiler PRIVATE -Isrc/ -Wall -Wextra -g)

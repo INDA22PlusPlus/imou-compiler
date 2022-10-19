@@ -17,7 +17,7 @@ static char* memcpy_str(void* mem, size_t size) {
     return _str;
 }
 
-static const char* _node_type_to_str(_ASTNodeType type) {
+const char* _node_type_to_str(_ASTNodeType type) {
     switch (type)
     {
     case FUNCTION_CALL:         return "FUNCTION CALL";
@@ -334,6 +334,13 @@ ASTNode* _parse_rpn(_token** query, uint8_t* query_size) {
     node = root;
     
     for (int i = (*query_size)-2; i >= 0; i-- ) {
+        /*  If the binary math operator node is fully filled
+            jump to the parent one that has only one child */
+        if (node->children_num == 2) {
+            while (node->children_num == 2) {
+                node = _parent(node, query[i+1]);
+            }
+        }
         /* Create a new tree sub node if operand */
         if (_is_token_special(query[i])) {
             ASTNode* sub = _init_default_ASTNode();
@@ -343,12 +350,6 @@ ASTNode* _parse_rpn(_token** query, uint8_t* query_size) {
             node = &node->children[node->children_num-1];
             
             continue;
-        }
-
-        /*  If the binary math operator node is fully filled
-            jump to the parent one                          */
-        if (node->children_num == 2) {
-            node = _parent(node, query[i+1]);
         }
         
         /*  Create a variable or constant node. Free the memory
