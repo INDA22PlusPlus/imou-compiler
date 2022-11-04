@@ -33,3 +33,4 @@ uint8_t _symbol_table_get_ind(_symbol_table* table, char* var);
 
 
 void _compile(ASTNode* root, _symbol_table* table);
+

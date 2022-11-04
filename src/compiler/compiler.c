@@ -194,6 +194,7 @@ void _compile(ASTNode* root, _symbol_table* table) {
 
             break;
         default: return;
+        
         }
     }
 }
